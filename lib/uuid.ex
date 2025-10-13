@@ -461,7 +461,7 @@ defmodule Uniq.UUID do
 
   def parse("urn:uuid:" <> uuid) do
     with {:ok, uuid} <- parse(uuid) do
-      {:ok, %__MODULE__{uuid | format: :urn}}
+      {:ok, %{uuid | format: :urn}}
     end
   end
 
@@ -498,15 +498,15 @@ defmodule Uniq.UUID do
   def parse(_bin), do: {:error, :invalid_format}
 
   # Parse version
-  defp parse_raw(<<_::48, version::uint(4), _::bitstring>> = bin, acc) do
+  defp parse_raw(<<_::48, version::uint(4), _::bitstring>> = bin, %__MODULE__{} = acc) do
     case version do
       v when v in [1, 3, 4, 5, 6, 7] ->
         with {:ok, uuid} <- parse_raw(version, bin, acc) do
-          {:ok, %__MODULE__{uuid | bytes: bin}}
+          {:ok, %{uuid | bytes: bin}}
         end
 
       _ when bin == @nil_id ->
-        {:ok, %__MODULE__{acc | bytes: @nil_id}}
+        {:ok, %{acc | bytes: @nil_id}}
 
       _ ->
         {:error, {:unknown_version, version}}
@@ -535,7 +535,7 @@ defmodule Uniq.UUID do
     variant = Macro.escape(variant)
 
     # Parses RFC 4122, version 1-5 uuids
-    defp parse_raw(version, unquote(variant), time, rest, acc) when version < 6 do
+    defp parse_raw(version, unquote(variant), time, rest, %__MODULE__{} = acc) when version < 6 do
       variant_size = unquote(variant_size)
       clock_hi_size = 8 - variant_size
       clock_size = 8 + clock_hi_size
@@ -549,7 +549,7 @@ defmodule Uniq.UUID do
            <<clock::uint(clock_size)>> <-
              <<clock_hi::bits(clock_hi_size), clock_lo::bits(8)>> do
         {:ok,
-         %__MODULE__{
+         %{
            acc
            | version: version,
              variant: unquote(variant),
@@ -565,11 +565,11 @@ defmodule Uniq.UUID do
   end
 
   # Parses proposed version 7 uuids
-  defp parse_raw(7, <<1::1, 0::1>> = variant, time, rest, acc) do
+  defp parse_raw(7, <<1::1, 0::1>> = variant, time, rest, %__MODULE__{} = acc) do
     with <<time::biguint(48), _version::4, _rand_a::12>> <- <<time::64>>,
          <<_rand_b::62>> <- rest do
       {:ok,
-       %__MODULE__{
+       %{
          acc
          | version: 7,
            variant: variant,
@@ -582,13 +582,13 @@ defmodule Uniq.UUID do
   end
 
   # Parses proposed version 6 uuids, which are very much like version 1, but with some field ordering changes
-  defp parse_raw(6, <<1::1, 0::1>> = variant, time, rest, acc) do
+  defp parse_raw(6, <<1::1, 0::1>> = variant, time, rest, %__MODULE__{} = acc) do
     with <<time_hi::48, _version::4, time_lo::12>> <- <<time::64>>,
          <<timestamp::uint(60)>> <- <<time_hi::48, time_lo::12>>,
          <<clock::uint(14), node::bits(48)>> <-
            rest do
       {:ok,
-       %__MODULE__{
+       %{
          acc
          | version: 6,
            variant: variant,
@@ -834,7 +834,6 @@ defmodule Uniq.UUID do
     # Ensure the multicast bit is set, as per RFC 4122
     <<head::7, 1::1, tail::40>>
   end
-
 
   defp hash(:md5, data), do: :crypto.hash(:md5, data)
   defp hash(:sha, data), do: :binary.part(:crypto.hash(:sha, data), 0, 16)
