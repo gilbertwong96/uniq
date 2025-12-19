@@ -1122,7 +1122,7 @@ defmodule Uniq.UUID do
     def equal?(nil, nil, _), do: true
     def equal?(nil, b, _), do: to_string(b, :raw) == @nil_id
     def equal?(a, nil, _), do: to_string(a, :raw) == @nil_id
-    def equal?(a, b, _), do: compare(to_string(a), to_string(b)) == :eq
+    def equal?(a, b, _), do: compare(a, b) == :eq
   end
 
   defimpl String.Chars do
