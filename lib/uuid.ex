@@ -731,8 +731,8 @@ defmodule Uniq.UUID do
     do: do_compare(a, b)
 
   def compare(a, b) when is_binary(a) and is_binary(b) do
-    a = to_string(a)
-    b = to_string(b)
+    a = string_to_binary!(a)
+    b = string_to_binary!(b)
 
     do_compare(a, b)
   end
