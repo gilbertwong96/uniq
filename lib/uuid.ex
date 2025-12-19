@@ -739,11 +739,11 @@ defmodule Uniq.UUID do
 
   defp do_compare(a, b) do
     cond do
-      a < b ->
-        :lt
-
       a == b ->
         :eq
+
+      a < b ->
+        :lt
 
       :else ->
         :gt
