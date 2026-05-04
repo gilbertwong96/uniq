@@ -731,19 +731,19 @@ defmodule Uniq.UUID do
     do: do_compare(a, b)
 
   def compare(a, b) when is_binary(a) and is_binary(b) do
-    a = to_string(a)
-    b = to_string(b)
+    a = string_to_binary!(a)
+    b = string_to_binary!(b)
 
     do_compare(a, b)
   end
 
   defp do_compare(a, b) do
     cond do
-      a < b ->
-        :lt
-
       a == b ->
         :eq
+
+      a < b ->
+        :lt
 
       :else ->
         :gt
@@ -1122,7 +1122,7 @@ defmodule Uniq.UUID do
     def equal?(nil, nil, _), do: true
     def equal?(nil, b, _), do: to_string(b, :raw) == @nil_id
     def equal?(a, nil, _), do: to_string(a, :raw) == @nil_id
-    def equal?(a, b, _), do: compare(to_string(a), to_string(b)) == :eq
+    def equal?(a, b, _), do: compare(a, b) == :eq
   end
 
   defimpl String.Chars do
