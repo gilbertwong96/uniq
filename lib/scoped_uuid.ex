@@ -1,4 +1,6 @@
 defmodule Uniq.ScopedUUID do
+  import Uniq.Macros, only: [defextension: 2]
+
   @doc """
   Generates and validates UUIDs in Ecto schemas which are scoped using a prefix.
 
@@ -35,116 +37,119 @@ defmodule Uniq.ScopedUUID do
       end
 
   """
-  use Ecto.ParameterizedType
 
-  @impl true
-  def init(opts) do
-    schema = Keyword.fetch!(opts, :schema)
-    field = Keyword.fetch!(opts, :field)
-    version = Keyword.get(opts, :uuid_version, 7)
+  defextension Ecto.ParameterizedType do
+    use Ecto.ParameterizedType
 
-    uuid_config =
-      Uniq.UUID.init(
-        schema: schema,
-        field: field,
-        version: version,
-        format: :slug,
-        default: :raw,
-        dump: :raw
-      )
+    @impl true
+    def init(opts) do
+      schema = Keyword.fetch!(opts, :schema)
+      field = Keyword.fetch!(opts, :field)
+      version = Keyword.get(opts, :uuid_version, 7)
 
-    foreign_key? = Keyword.get(opts, :foreign_key) != nil
+      uuid_config =
+        Uniq.UUID.init(
+          schema: schema,
+          field: field,
+          version: version,
+          format: :slug,
+          default: :raw,
+          dump: :raw
+        )
 
-    if foreign_key? do
-      %{
-        schema: schema,
-        field: field,
-        uuid_config: uuid_config
-      }
-    else
-      scope = Keyword.get(opts, :scope) || raise "`:scope` option is required"
+      foreign_key? = Keyword.get(opts, :foreign_key) != nil
 
-      if String.contains?(scope, "_") do
-        raise "ScopedUUID scopes may not contain underscores."
+      if foreign_key? do
+        %{
+          schema: schema,
+          field: field,
+          uuid_config: uuid_config
+        }
+      else
+        scope = Keyword.get(opts, :scope) || raise "`:scope` option is required"
+
+        if String.contains?(scope, "_") do
+          raise "ScopedUUID scopes may not contain underscores."
+        end
+
+        %{
+          scope: scope,
+          uuid_config: uuid_config
+        }
       end
-
-      %{
-        scope: scope,
-        uuid_config: uuid_config
-      }
     end
-  end
 
-  @impl true
-  def type(_params), do: :uuid
+    @impl true
+    def type(_params), do: :uuid
 
-  @impl true
-  def cast(nil, _params), do: {:ok, nil}
+    @impl true
+    def cast(nil, _params), do: {:ok, nil}
 
-  def cast(data, params) do
-    scope = scope_for(params)
+    def cast(data, params) do
+      scope = scope_for(params)
 
-    case extract_uuid(data, params) do
-      {:ok, ^scope, _uuid} -> {:ok, data}
-      _error -> :error
+      case extract_uuid(data, params) do
+        {:ok, ^scope, _uuid} -> {:ok, data}
+        _error -> :error
+      end
     end
-  end
 
-  @impl true
-  def load(data, loader, params) do
-    case Uniq.UUID.load(data, loader, params.uuid_config) do
-      {:ok, nil} -> {:ok, nil}
-      {:ok, uuid} -> {:ok, add_scope(uuid, params)}
-      :error -> :error
+    @impl true
+    def load(data, loader, params) do
+      case Uniq.UUID.load(data, loader, params.uuid_config) do
+        {:ok, nil} -> {:ok, nil}
+        {:ok, uuid} -> {:ok, add_scope(uuid, params)}
+        :error -> :error
+      end
     end
-  end
 
-  @impl true
-  def dump(nil, _, _), do: {:ok, nil}
+    @impl true
+    def dump(nil, _, _), do: {:ok, nil}
 
-  def dump(slug, _dumper, params) do
-    case extract_uuid(slug, params) do
-      {:ok, _scope, uuid} -> {:ok, uuid}
-      :error -> :error
+    def dump(slug, _dumper, params) do
+      case extract_uuid(slug, params) do
+        {:ok, _scope, uuid} -> {:ok, uuid}
+        :error -> :error
+      end
     end
-  end
 
-  @impl true
-  def autogenerate(params) do
-    params.uuid_config
-    |> Uniq.UUID.autogenerate()
-    |> add_scope(params)
-  end
-
-  @spec generate(module, field :: atom) ::
-          {:ok, scoped_uuid :: String.t()} | {:error, reason :: String.t()}
-  @doc "Generates an ID for a schema module and field, by default the id field"
-  def generate(module, field \\ :id) do
-    try do
-      {:parameterized, {Uniq.ScopedUUID, params}} =
-        Map.get(module.__changeset__(), field)
-
-      {:ok, autogenerate(params)}
-    rescue
-      _ ->
-        {:error, "Can only generate IDs for ScopedUUID fields"}
+    @impl true
+    def autogenerate(params) do
+      params.uuid_config
+      |> Uniq.UUID.autogenerate()
+      |> add_scope(params)
     end
-  end
 
-  @impl true
-  def embed_as(format, params), do: Uniq.UUID.embed_as(format, params.uuid_config)
+    @spec generate(module, field :: atom) ::
+            {:ok, scoped_uuid :: String.t()} | {:error, reason :: String.t()}
+    @doc "Generates an ID for a schema module and field, by default the id field"
+    def generate(module, field \\ :id) do
+      try do
+        {:parameterized, {Uniq.ScopedUUID, params}} =
+          Map.get(module.__changeset__(), field)
 
-  @impl true
-  def equal?(nil, nil, _params), do: true
-  def equal?(nil, _b, _params), do: false
-  def equal?(_a, nil, _params), do: false
+        {:ok, autogenerate(params)}
+      rescue
+        _ ->
+          {:error, "Can only generate IDs for ScopedUUID fields"}
+      end
+    end
 
-  def equal?(a, b, params) do
-    with {:ok, scope, uuid_a} <- extract_uuid(a, params),
-         {:ok, ^scope, uuid_b} <- extract_uuid(b, params) do
-      Uniq.UUID.equal?(uuid_a, uuid_b, params.uuid_config)
-    else
-      _ -> Uniq.UUID.equal?(a, b, params.uuid_config)
+    @impl true
+    def embed_as(format, params), do: Uniq.UUID.embed_as(format, params.uuid_config)
+
+    @impl true
+    def equal?(nil, nil, _params), do: true
+    def equal?(nil, _b, _params), do: false
+    def equal?(_a, nil, _params), do: false
+
+    def equal?(a, b, params) do
+      with {:ok, scope, uuid_a} <- extract_uuid(a, params),
+           {:ok, ^scope, uuid_b} <- extract_uuid(b, params) do
+        Uniq.UUID.equal?(uuid_a, uuid_b, params.uuid_config)
+      else
+        _ -> Uniq.UUID.equal?(a, b, params.uuid_config)
+      end
     end
   end
 
