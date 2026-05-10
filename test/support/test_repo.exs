@@ -48,6 +48,9 @@ defmodule Ecto.TestAdapter do
   def autogenerate(:binary_id), do: Ecto.UUID.bingenerate()
 
   ## Queryable
+  def delete(_adapter_meta, _schema_meta, _filters, _returning, _options) do
+    {:ok, []}
+  end
 
   def prepare(operation, query), do: {:nocache, {operation, query}}
 
